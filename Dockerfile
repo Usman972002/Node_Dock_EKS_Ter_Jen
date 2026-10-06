@@ -1,18 +1,3 @@
-# FROM node:20-alpine AS base
-# WORKDIR /app
-
-# COPY package*.json ./
-# RUN npm ci --omit=dev
-
-# COPY src ./src
-
-# ENV NODE_ENV=production
-# EXPOSE 8000
-
-# USER node
-# CMD ["node", "src/index.js"]
-
-# Production ready for EKS 
 FROM node:22-alpine AS base            # Node 20 is end-of-life; 22 is the maintained LTS line
 WORKDIR /app                           # all later paths are relative to /app
 
