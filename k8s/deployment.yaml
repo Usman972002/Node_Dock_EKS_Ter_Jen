@@ -1,0 +1,63 @@
+apiVersion: apps/v1                              # Deployments live in apps/v1
+kind: Deployment                                 # manages ReplicaSets: rolling updates and rollback
+metadata:
+  name: backend-api
+  namespace: backend
+  labels: { app: backend-api }
+spec:
+  replicas: 2                                    # starting size; the HPA takes over
+  revisionHistoryLimit: 5                        # keep 5 old ReplicaSets for `rollout undo`
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1                                # one extra pod while rolling
+      maxUnavailable: 0                          # never drop below desired capacity -> zero downtime
+  selector:
+    matchLabels: { app: backend-api }            # which pods this Deployment owns; must match template labels
+  template:
+    metadata:
+      labels: { app: backend-api }               # Service, PDB and Prometheus find pods by this label
+    spec:
+      terminationGracePeriodSeconds: 30          # time allowed for your graceful shutdown handler
+      topologySpreadConstraints:                 # spread pods across AZs
+        - maxSkew: 1                             # AZ pod counts may differ by at most 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway      # prefer spreading but never block scheduling
+          labelSelector:
+            matchLabels: { app: backend-api }
+      securityContext:                           # pod-level security
+        runAsNonRoot: true                       # refuse to start as root
+        runAsUser: 1000                          # numeric UID (the "node" user); required for the check above
+        runAsGroup: 1000
+        seccompProfile: { type: RuntimeDefault } # default syscall filter
+      containers:
+        - name: api
+          image: IMAGE_PLACEHOLDER               # Jenkins replaces this with <ecr-uri>:<tag> using sed
+          imagePullPolicy: IfNotPresent          # tags are immutable, so caching is safe
+          ports:
+            - name: http
+              containerPort: 8000                # the port your Express app listens on
+          envFrom:
+            - configMapRef: { name: backend-config }   # load all ConfigMap keys as env vars
+            - secretRef:    { name: backend-secret }   # load DB_USER, DB_PASSWORD, JWT_SECRET
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }     # scheduler reservation; HPA % is measured against the CPU request
+            limits:   { cpu: 500m, memory: 256Mi }     # hard ceiling; exceeding memory = OOMKilled
+          startupProbe:                          # gives the app time to boot before other probes run
+            httpGet: { path: /api/health, port: http }
+            periodSeconds: 2
+            failureThreshold: 30                 # 30 x 2s = up to 60s to start
+          readinessProbe:                        # decides whether the pod receives traffic
+            httpGet: { path: /api/health, port: http }   # deliberately does NOT touch the DB
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:                         # restarts the container if it hangs
+            httpGet: { path: /api/health, port: http }
+            periodSeconds: 10
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec: { command: ["sleep", "10"] } # let the ALB deregister the pod before SIGTERM arrives
+          securityContext:                       # container-level hardening
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }

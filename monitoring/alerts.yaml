@@ -1,0 +1,36 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata: { name: backend-alerts, namespace: monitoring }
+spec:
+  groups:
+    - name: backend
+      rules:
+        - alert: ExternalMySQLUnreachable
+          expr: probe_success{instance="184.168.20.49:3306"} == 0    # TCP connect failing
+          for: 2m                                                     # ignore short blips
+          labels: { severity: critical }
+          annotations: { summary: "MySQL port unreachable from the cluster (NAT allow-list, firewall or DB down)" }
+        - alert: AppCannotReachDatabase
+          expr: probe_success{instance="https://api.cloudwithusman.online/api/health/db"} == 0
+          for: 2m
+          labels: { severity: critical }
+          annotations: { summary: "API is up but its database check fails" }
+        - alert: PublicApiDown
+          expr: probe_success{instance="https://api.cloudwithusman.online/api/health"} == 0
+          for: 2m
+          labels: { severity: critical }
+          annotations: { summary: "Public API health check failing" }
+        - alert: BackendPodCrashLooping
+          expr: increase(kube_pod_container_status_restarts_total{namespace="backend"}[15m]) > 3
+          labels: { severity: warning }
+          annotations: { summary: "Backend pod restarting repeatedly" }
+        - alert: BackendReplicasUnavailable
+          expr: kube_deployment_status_replicas_available{namespace="backend"} < kube_deployment_spec_replicas{namespace="backend"}
+          for: 5m
+          labels: { severity: warning }
+          annotations: { summary: "Fewer ready backend pods than desired" }
+        - alert: BackendMemoryNearLimit
+          expr: max by (pod)(container_memory_working_set_bytes{namespace="backend",container="api"}) / 268435456 > 0.9
+          for: 5m
+          labels: { severity: warning }
+          annotations: { summary: "Backend pod above 90% of its 256Mi memory limit" }

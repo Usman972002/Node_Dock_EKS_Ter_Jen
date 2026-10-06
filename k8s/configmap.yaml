@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap                                  # non-secret settings
+metadata:
+  name: backend-config
+  namespace: backend
+data:                                            # every key becomes an environment variable via envFrom
+  NODE_ENV: "production"
+  HOST: "0.0.0.0"                                # listen on all interfaces inside the pod
+  PORT: "8000"                                   # must match containerPort
+  CLUSTER: "false"                               # one process per pod; scaling is the HPA's job
+  LOG_LEVEL: "info"                              # Pino log level
+  JWT_EXPIRES_IN: "1d"
+  CORS_ORIGIN: "https://cloudwithusman.online"   # exact frontend origin, NOT "*"
+  DB_HOST: "184.168.20.49"                       # external MySQL
+  DB_PORT: "3306"
+  DB_NAME: "appdb"
+  DB_SSL: "true"                                 # app enables TLS to the DB (if the DB supports it)

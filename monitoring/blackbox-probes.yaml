@@ -1,0 +1,23 @@
+apiVersion: monitoring.coreos.com/v1
+kind: Probe                                      # CRD handled by the Prometheus Operator
+metadata: { name: external-mysql-tcp, namespace: monitoring }
+spec:
+  module: tcp_connect                            # default blackbox module: can we open the TCP port?
+  prober: { url: blackbox-prometheus-blackbox-exporter.monitoring:9115 }   # the blackbox Service
+  targets: { staticConfig: { static: ["184.168.20.49:3306"] } }   # NOTE: probes originate from a cluster pod -> same NAT path as the app
+---
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata: { name: public-api-health, namespace: monitoring }
+spec:
+  module: http_2xx                               # expect a 2xx response
+  prober: { url: blackbox-prometheus-blackbox-exporter.monitoring:9115 }
+  targets: { staticConfig: { static: ["https://api.cloudwithusman.online/api/health"] } }   # whole path: DNS, ALB, cert, pod
+---
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata: { name: public-api-db-health, namespace: monitoring }
+spec:
+  module: http_2xx
+  prober: { url: blackbox-prometheus-blackbox-exporter.monitoring:9115 }
+  targets: { staticConfig: { static: ["https://api.cloudwithusman.online/api/health/db"] } }   # the endpoint from section 12: proves app -> DB works

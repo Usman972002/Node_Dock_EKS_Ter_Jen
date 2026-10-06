@@ -1,0 +1,18 @@
+grafana:
+  adminPassword: "ChangeMe123"                   # set a real one
+  persistence: { enabled: true, storageClassName: gp3, size: 5Gi }   # dashboards survive restarts
+prometheus:
+  prometheusSpec:
+    retention: 7d                                # drop data older than 7 days
+    serviceMonitorSelectorNilUsesHelmValues: false   # discover ServiceMonitors in ALL namespaces
+    podMonitorSelectorNilUsesHelmValues: false
+    probeSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false         # same for PrometheusRules
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp3
+          accessModes: ["ReadWriteOnce"]
+          resources: { requests: { storage: 20Gi } }
+alertmanager:
+  enabled: true

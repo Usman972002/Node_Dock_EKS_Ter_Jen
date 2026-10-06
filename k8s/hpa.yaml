@@ -1,0 +1,20 @@
+apiVersion: autoscaling/v2                       # v2 supports several metrics and behaviour tuning
+kind: HorizontalPodAutoscaler
+metadata:
+  name: backend-hpa
+  namespace: backend
+spec:
+  scaleTargetRef:                                # what to scale
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend-api
+  minReplicas: 2
+  maxReplicas: 6                                 # remember: 6 pods x DB pool size must stay under the DB's connection cap
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 70 }   # 70% of the CPU *request*
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300            # wait 5 minutes before shrinking to avoid flapping
